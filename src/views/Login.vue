@@ -79,16 +79,24 @@ export default defineComponent({
 
           router.push('/student')
         } else {
-          await userApi.register({
+          const response = await userApi.register({
             username: username.value,
             password: password.value
           })
-          ElMessage.success('注册成功，请登录')
-          isLogin.value = true
-          username.value = ''
-          password.value = ''
+
+          // 检查注册响应的状态码
+          if (response.data.code === 200) {
+            ElMessage.success('注册成功，请登录')
+            isLogin.value = true
+            username.value = ''
+            password.value = ''
+          } else {
+            // 显示后端返回的具体错误信息
+            ElMessage.error(response.data.message || '注册失败')
+          }
         }
       } catch (error: any) {
+        // 处理网络错误或其他异常
         const message = error.response?.data?.message || (isLogin.value ? '登录失败' : '注册失败')
         ElMessage.error(message)
       } finally {

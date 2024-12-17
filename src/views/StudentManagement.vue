@@ -1,22 +1,16 @@
 <template>
   <div class="student-management">
     <div class="header">
-      <h2>学生管理系统   by 22008056 yyh</h2>
+      <h2>学生管理系统 by 22008056 yyh</h2>
       <el-button type="danger" @click="handleLogout">退出登录</el-button>
     </div>
-    
+
     <!-- 搜索区域 -->
     <div class="search-area">
-      <el-input
-        v-model="searchQuery"
-        placeholder="输入姓名或班级搜索"
-        style="width: 200px"
-        clearable
-        @input="handleSearch"
-      />
+      <el-input v-model="searchQuery" placeholder="输入姓名或班级搜索" style="width: 200px" clearable @input="handleSearch" />
       <el-button type="primary" @click="showAddDialog">添加学生</el-button>
     </div>
-    
+
     <!-- 学生列表 -->
     <el-table :data="displayStudents" style="margin-top: 20px">
       <el-table-column prop="id" label="学号" width="100" />
@@ -34,23 +28,13 @@
 
     <!-- 分页 -->
     <div class="pagination">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[5, 10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        :total="filteredStudents.length"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[5, 10, 20, 50]"
+        layout="total, sizes, prev, pager, next" :total="filteredStudents.length" @size-change="handleSizeChange"
+        @current-change="handleCurrentChange" />
     </div>
 
     <!-- 添加/编辑对话框 -->
-    <el-dialog
-      :title="dialogTitle"
-      v-model="dialogVisible"
-      width="500px"
-    >
+    <el-dialog :title="dialogTitle" v-model="dialogVisible" width="500px">
       <el-form :model="currentStudent" label-width="80px">
         <el-form-item label="姓名">
           <el-input v-model="currentStudent.name" />
@@ -79,6 +63,7 @@ import type { Student } from '../types/student'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { studentApi } from '../api'
+import { AuthService } from '@/services/auth.service'
 
 const router = useRouter()
 const students = ref<Student[]>([])
@@ -90,7 +75,7 @@ const pageSize = ref(10)
 const filteredStudents = computed(() => {
   if (!searchQuery.value) return students.value
   const query = searchQuery.value.toLowerCase()
-  return students.value.filter(student => 
+  return students.value.filter(student =>
     student.name.toLowerCase().includes(query) ||
     student.className.toLowerCase().includes(query)
   )
@@ -203,9 +188,23 @@ const handleDelete = async (row: Student) => {
 }
 
 // 添加退出登录方法
-const handleLogout = () => {
-  localStorage.removeItem('currentUser')
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '退出后将无法自动登录，是否确认退出？',
+      '提示',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    AuthService.logout()
+    router.push('/login')
+  } catch {
+    // 用户取消退出
+  }
 }
 
 onMounted(() => {
