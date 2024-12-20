@@ -1,15 +1,17 @@
 import { userApi } from '../api'
 import type { LoginParams } from '../types/api'
 import axios from 'axios'
+import { User } from '../types/user'
 
 export class AuthService {
     static async login(credentials: LoginParams) {
         try {
             const response = await userApi.login(credentials)
-            const { token } = response.data.data
+            const { token, user } = response.data.data
 
-            // 保存token
+            // 保存token和用户信息
             localStorage.setItem('token', token)
+            localStorage.setItem('user', JSON.stringify(user))
 
             // 设置axios默认headers
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
@@ -22,6 +24,7 @@ export class AuthService {
 
     static logout() {
         localStorage.removeItem('token')
+        localStorage.removeItem('user')
         localStorage.removeItem('rememberedCredentials')
         delete axios.defaults.headers.common['Authorization']
     }
@@ -54,6 +57,16 @@ export class AuthService {
 
     static clearRememberedCredentials() {
         localStorage.removeItem('rememberedCredentials')
+    }
+
+    static getCurrentUser(): User | null {
+        const userStr = localStorage.getItem('user')
+        return userStr ? JSON.parse(userStr) : null
+    }
+
+    static isAdmin(): boolean {
+        const user = this.getCurrentUser()
+        return user?.role === 'admin'
     }
 
 

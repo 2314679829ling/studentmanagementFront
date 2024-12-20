@@ -6,12 +6,18 @@ import type { LoginParams, RegisterParams, LoginResponse } from '@/types/api'
 import { AuthService } from '@/services/auth.service'
 import router from '@/router'
 
+// 声明全局变量
+declare const __DEV__: boolean
+declare const __API_URL__: string
+
 export const api = axios.create({
-    baseURL: 'http://localhost:8080/api',
+    baseURL: __API_URL__,
     timeout: 5000,
     headers: {
         'Content-Type': 'application/json'
-    }
+    },
+    // 只在开发环境启用
+    withCredentials: __DEV__
 })
 
 // 请求拦截器
@@ -20,15 +26,31 @@ api.interceptors.request.use(config => {
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
     }
+    // 开发环境打印请求信息
+    if (__DEV__) {
+        console.log('API Request:', {
+            url: config.url,
+            method: config.method,
+            data: config.data
+        })
+    }
     return config
 })
 
 // 响应拦截器
 api.interceptors.response.use(
-    response => response,
+    response => {
+        if (__DEV__) {
+            console.log('API Response:', response.data)
+        }
+        return response
+    },
     error => {
+        if (__DEV__) {
+            console.error('API Error:', error.response || error)
+        }
+
         if (error.response?.status === 401) {
-            // token过期或无效，清除token并重定向到登录页
             AuthService.logout()
             router.push('/login')
         }
