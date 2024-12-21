@@ -39,7 +39,7 @@ export class AuthService {
 
         try {
             const payload = JSON.parse(atob(token.split('.')[1]))
-            // 检查token是否在24小时有效期内
+            // 检查token是否有效期内
             return payload.exp * 1000 > Date.now()
         } catch {
             return false
