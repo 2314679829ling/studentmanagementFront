@@ -4,10 +4,25 @@
       <h2>{{ isLogin ? '登录' : '注册' }}</h2>
       <form @submit.prevent="handleSubmit">
         <div class="form-group">
-          <input v-model="username" type="text" placeholder="用户名" required />
+          <input 
+            v-model="formData.username" 
+            type="text" 
+            placeholder="用户名" 
+            @input="handleUsernameInput"
+            required 
+          />
         </div>
         <div class="form-group">
-          <input v-model="password" type="password" placeholder="密码" required />
+          <input 
+            v-model="formData.password" 
+            type="password" 
+            placeholder="密码" 
+            @input="validatePassword"
+            required 
+          />
+          <div v-if="!isLogin && passwordError" class="error-message">
+            {{ passwordError }}
+          </div>
         </div>
         <div v-if="isLogin" class="remember-password">
           <label>
@@ -27,101 +42,123 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue'
+<script lang="ts" setup>
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { AuthService } from '@/services/auth.service'
 import { userApi } from '@/api'
 import { ElMessage } from 'element-plus'
 
-export default defineComponent({
-  name: 'Login',
-  setup() {
-    const router = useRouter()
-    const username = ref('')
-    const password = ref('')
-    const isLogin = ref(true)
-    const loading = ref(false)
-    const rememberPassword = ref(false)
+const router = useRouter()
+const loading = ref(false)
+const isLogin = ref(true)
+const rememberPassword = ref(false)
+const passwordError = ref('')
 
-    onMounted(async () => {
-      // 检查是否已经登录
-      if (AuthService.isAuthenticated()) {
-        router.push('/student')
-        return
-      }
+// 使用响应式对象管理表单数据
+const formData = reactive({
+  username: '',
+  password: ''
+})
 
-      // 检查是否有保存的凭证
-      const savedCredentials = AuthService.getRememberedCredentials()
-      if (savedCredentials) {
-        username.value = savedCredentials.username
-        password.value = savedCredentials.password
-        rememberPassword.value = true
-      }
-    })
+// 处理用户名输入，去除首尾空格
+const handleUsernameInput = () => {
+  formData.username = formData.username.trim()
+}
 
-    const handleSubmit = async () => {
-      if (loading.value) return
-      loading.value = true
+// 验证密码
+const validatePassword = () => {
+  // 移除密码中的空格
+  if (formData.password.includes(' ')) {
+    formData.password = formData.password.replace(/\s/g, '')
+  }
 
-      try {
-        if (isLogin.value) {
-          await AuthService.login({
-            username: username.value,
-            password: password.value
-          })
-
-          if (rememberPassword.value) {
-            AuthService.saveCredentials(username.value, password.value)
-          } else {
-            AuthService.clearRememberedCredentials()
-          }
-
-          router.push('/student')
-        } else {
-          const response = await userApi.register({
-            username: username.value,
-            password: password.value
-          })
-
-          // 检查注册响应的状态码
-          if (response.data.code === 200) {
-            ElMessage.success('注册成功，请登录')
-            isLogin.value = true
-            username.value = ''
-            password.value = ''
-          } else {
-            // 显示后端返回的具体错误信息
-            ElMessage.error(response.data.message || '注册失败')
-          }
-        }
-      } catch (error: any) {
-        // 处理网络错误或其他异常
-        const message = error.response?.data?.message || (isLogin.value ? '登录失败' : '注册失败')
-        ElMessage.error(message)
-      } finally {
-        loading.value = false
-      }
-    }
-
-    const toggleMode = () => {
-      isLogin.value = !isLogin.value
-      username.value = ''
-      password.value = ''
-      rememberPassword.value = false
-    }
-
-    return {
-      username,
-      password,
-      isLogin,
-      loading,
-      rememberPassword,
-      handleSubmit,
-      toggleMode
+  if (!isLogin.value) {
+    if (formData.password.length < 4) {
+      passwordError.value = '密码不能少于4位'
+    } else {
+      passwordError.value = ''
     }
   }
-})
+}
+
+const handleSubmit = async () => {
+  if (loading.value) return
+  
+  // 注册时的密码验证
+  if (!isLogin.value) {
+    if (formData.password.length < 4) {
+      ElMessage.error('密码不能少于4位')
+      return
+    }
+  }
+
+  // 确保密码不含空格
+  formData.password = formData.password.replace(/\s/g, '')
+
+  loading.value = true
+
+  try {
+    if (isLogin.value) {
+      await AuthService.login({
+        username: formData.username.trim(),
+        password: formData.password 
+      })
+
+      if (rememberPassword.value) {
+        AuthService.saveCredentials(formData.username.trim(), formData.password)
+      } else {
+        AuthService.clearRememberedCredentials()
+      }
+
+      router.push('/student')
+    } else {
+      const response = await userApi.register({
+        username: formData.username.trim(),
+        password: formData.password // 已经移除空格，不需要再trim
+      })
+
+      if (response.data.code === 200) {
+        ElMessage.success('注册成功，请登录')
+        isLogin.value = true
+        formData.username = ''
+        formData.password = ''
+      } else {
+        ElMessage.error(response.data.message || '注册失败')
+      }
+    }
+  } catch (error: any) {
+    const message = error.response?.data?.message || (isLogin.value ? '登录失败' : '注册失败')
+    ElMessage.error(message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const toggleMode = () => {
+  isLogin.value = !isLogin.value
+  formData.username = ''
+  formData.password = ''
+  rememberPassword.value = false
+  passwordError.value = ''
+}
+
+// 初始化时检查记住的凭证
+const initSavedCredentials = () => {
+  const savedCredentials = AuthService.getRememberedCredentials()
+  if (savedCredentials) {
+    formData.username = savedCredentials.username
+    formData.password = savedCredentials.password
+    rememberPassword.value = true
+  }
+}
+
+// 检查是否已登录
+if (AuthService.isAuthenticated()) {
+  router.push('/student')
+} else {
+  initSavedCredentials()
+}
 </script>
 
 <style scoped>
@@ -149,6 +186,7 @@ h2 {
 
 .form-group {
   margin-bottom: 20px;
+  position: relative;
 }
 
 input {
@@ -220,5 +258,12 @@ input:focus {
   cursor: pointer;
   font-size: 14px;
   color: #606266;
+}
+
+.error-message {
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 4px;
+  padding-left: 4px;
 }
 </style>
